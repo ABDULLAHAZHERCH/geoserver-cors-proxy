@@ -1,0 +1,18 @@
+{
+  "name": "geoserver-cors-proxy",
+  "version": "1.0.0",
+  "description": "Node.js proxy to bypass CORS restrictions when fetching from GeoServer",
+  "main": "geoserver-proxy.js",
+  "scripts": {
+    "start": "node geoserver-proxy.js",
+    "dev": "node geoserver-proxy.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "node-fetch": "^2.6.11"
+  },
+  "keywords": ["geoserver", "proxy", "cors", "wfs", "geojson"],
+  "author": "",
+  "license": "MIT"
+}

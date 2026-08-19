@@ -1,0 +1,2377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Emergency Services Locator - Complete System</title>
+
+<!-- TailwindCSS - For development only. For production, use: npm install -D tailwindcss -->
+<!-- <script src="https://cdn.tailwindcss.com"></script> -->
+
+<!-- Leaflet + Plugins -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+
+#app { display: flex; height: 100vh; overflow: hidden; }
+
+/* Sidebar */
+#sidebar {
+  width: 400px;
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  color: white;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 4px 0 20px rgba(0,0,0,0.3);
+  z-index: 1000;
+  transition: transform 0.3s ease;
+}
+
+#sidebar.collapsed { transform: translateX(-400px); }
+
+.sidebar-header {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  scrollbar-width: thin;
+  scrollbar-color: #475569 #1e293b;
+}
+
+.sidebar-content::-webkit-scrollbar { width: 6px; }
+.sidebar-content::-webkit-scrollbar-track { background: #1e293b; }
+.sidebar-content::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+
+.section {
+  background: rgba(255,255,255,0.05);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid rgba(255,255,255,0.1);
+  transition: all 0.3s ease;
+}
+
+.section:hover {
+  background: rgba(255,255,255,0.08);
+  transform: translateY(-2px);
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: #93c5fd;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: rgba(59, 130, 246, 0.2);
+  border: 2px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 13px;
+}
+
+.filter-btn:hover { background: rgba(59, 130, 246, 0.3); }
+.filter-btn.active {
+  background: rgba(59, 130, 246, 0.4);
+  border-color: #3b82f6;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.3);
+}
+
+.filter-btn input[type="checkbox"] { display: none; }
+
+.stat-card {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(29, 78, 216, 0.2) 100%);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 10px;
+  border-left: 4px solid #3b82f6;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #60a5fa;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+
+.btn {
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+}
+
+.btn-secondary {
+  background: rgba(255,255,255,0.1);
+  color: white;
+}
+
+.btn-secondary:hover { background: rgba(255,255,255,0.15); }
+
+.place-item {
+  background: rgba(255,255,255,0.05);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-left: 3px solid transparent;
+}
+
+.place-item:hover {
+  background: rgba(59, 130, 246, 0.2);
+  border-left-color: #3b82f6;
+  transform: translateX(4px);
+}
+
+.place-name {
+  font-weight: 600;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.place-meta {
+  font-size: 12px;
+  color: #94a3b8;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+#map { flex: 1; height: 100vh; }
+
+.input-group {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.input-group input, .input-group select {
+  width: 100%;
+  padding: 10px 12px 10px 36px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 8px;
+  color: white;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.input-group input:focus, .input-group select:focus {
+  outline: none;
+  background: rgba(255,255,255,0.15);
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.input-group input::placeholder { color: #94a3b8; }
+
+.input-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+}
+
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-success {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+}
+
+.status-error {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+.status-warning {
+  background: rgba(251, 146, 60, 0.2);
+  color: #fb923c;
+}
+
+/* Tailwind utility class replacements */
+.text-xl { font-size: 20px; }
+.font-bold { font-weight: 700; }
+.mb-1 { margin-bottom: 4px; }
+.mb-0 { margin-bottom: 0; }
+.mt-3 { margin-top: 12px; }
+
+/* Chatbot Styles */
+#chatbot {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 400px;
+  height: 550px;
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  display: flex;
+  flex-direction: column;
+  z-index: 2000;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+#chatbot.minimized {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+#chatbot.minimized .chat-messages,
+#chatbot.minimized .chat-input-container,
+#chatbot.minimized .chat-clear-btn,
+#chatbot.minimized #chatToggleIcon {
+  display: none;
+}
+
+#chatbot.minimized .chat-header {
+  padding: 0;
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+#chatbot.minimized .chat-header-content {
+  display: none;
+}
+
+#chatbot.minimized .chat-icon {
+  display: flex !important;
+  font-size: 28px;
+  animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+.chat-header {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  padding: 16px;
+  border-radius: 16px 16px 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  position: relative;
+}
+
+.chat-header:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+}
+
+.chat-icon {
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.chat-header-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  opacity: 0.9;
+  margin-top: 4px;
+  color: white;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  background: #22c55e;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: #475569 #1e293b;
+}
+
+.chat-messages::-webkit-scrollbar { width: 6px; }
+.chat-messages::-webkit-scrollbar-track { background: #1e293b; }
+.chat-messages::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+
+.chat-message {
+  padding: 12px 14px;
+  border-radius: 12px;
+  max-width: 85%;
+  word-wrap: break-word;
+  animation: slideIn 0.3s ease;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-line;
+  color: white;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.chat-message.bot {
+  background: rgba(59, 130, 246, 0.15);
+  align-self: flex-start;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+  color: white;
+}
+
+.chat-message.user {
+  background: rgba(34, 197, 94, 0.15);
+  align-self: flex-end;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.1);
+  color: white;
+}
+
+.chat-message.system {
+  background: rgba(251, 146, 60, 0.15);
+  align-self: center;
+  border: 1px solid rgba(251, 146, 60, 0.3);
+  font-size: 12px;
+  padding: 8px 12px;
+  max-width: 90%;
+  text-align: center;
+  color: white;
+}
+
+.typing-indicator {
+  display: flex;
+  gap: 4px;
+  padding: 12px 14px;
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 12px;
+  align-self: flex-start;
+  max-width: 60px;
+}
+
+.typing-dot {
+  width: 8px;
+  height: 8px;
+  background: #60a5fa;
+  border-radius: 50%;
+  animation: typing 1.4s infinite;
+}
+
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes typing {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-10px); }
+}
+
+.chat-input-container {
+  padding: 12px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  display: flex;
+  gap: 8px;
+  background: rgba(0,0,0,0.2);
+}
+
+.chat-input {
+  flex: 1;
+  padding: 12px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 8px;
+  color: white;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.chat-input:focus {
+  outline: none;
+  background: rgba(255,255,255,0.15);
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.chat-input::placeholder {
+  color: #94a3b8;
+}
+
+.chat-send-btn {
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.chat-send-btn:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.chat-send-btn:active {
+  transform: translateY(0);
+}
+
+.chat-clear-btn {
+  padding: 8px;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  color: #f87171;
+  cursor: pointer;
+  font-size: 11px;
+  transition: all 0.2s ease;
+}
+
+.chat-clear-btn:hover {
+  background: rgba(239, 68, 68, 0.3);
+}
+
+.notification-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #ef4444;
+  color: white;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  animation: pulse 2s infinite;
+}
+
+/* Tool Panel - REMOVED */
+/*
+.tool-panel {
+  position: absolute;
+  top: 10px;
+  left: 420px;
+  background: rgba(30, 41, 59, 0.95);
+  padding: 12px;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  z-index: 999;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tool-btn {
+  padding: 8px 12px;
+  background: rgba(59, 130, 246, 0.3);
+  border: 2px solid transparent;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+
+.tool-btn:hover {
+  background: rgba(59, 130, 246, 0.5);
+}
+
+.tool-btn.active {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.6);
+}
+*/
+
+.coord-control {
+  background: rgba(30,41,59,0.85);
+  color: #cbd5e1;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+  pointer-events: none;
+}
+
+.leaflet-popup-content-wrapper {
+  background: #1e293b;
+  color: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+}
+
+.leaflet-popup-tip { background: #1e293b; }
+
+.popup-content {
+  padding: 4px;
+}
+
+.popup-title {
+  font-weight: 700;
+  font-size: 15px;
+  margin-bottom: 6px;
+  color: #60a5fa;
+}
+
+.popup-info {
+  font-size: 12px;
+  margin-bottom: 3px;
+  color: #cbd5e1;
+}
+
+.popup-btn {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 5px 10px;
+  background: #3b82f6;
+  color: white;
+  text-decoration: none;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.popup-btn:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+
+/* Quick Actions */
+.quick-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.quick-action-btn {
+  padding: 4px 8px;
+  background: rgba(59, 130, 246, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 6px;
+  color: #93c5fd;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.quick-action-btn:hover {
+  background: rgba(59, 130, 246, 0.4);
+  color: white;
+}
+
+/* Coordinate Display Control */
+.coord-control {
+  background: rgba(30, 41, 59, 0.95);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <!-- Header -->
+    <div class="sidebar-header">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <h1 class="text-xl font-bold mb-1">🚨 Emergency Services GIS</h1>
+        <button id="darkModeToggle" class="btn btn-secondary" style="padding: 6px 10px; font-size: 14px;" title="Toggle Dark/Light Mode">🌙 Dark</button>
+      </div>
+      <div id="locationStatus" class="status-indicator status-warning mt-3">
+        <span>📡</span>
+        <span>Initializing...</span>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="sidebar-content">
+
+      <!-- Search -->
+      <div class="section">
+        <div class="section-title">🔍 Search</div>
+        <div class="input-group">
+          <span class="input-icon">🔎</span>
+          <input id="searchInput" type="text" placeholder="Search by name or type...">
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="section">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <button id="btnLocate" class="btn btn-primary">
+            <span>📍</span>
+            <span>Locate Me</span>
+          </button>
+          <button id="btnRefresh" class="btn btn-secondary">
+            <span>🔄</span>
+            <span>Refresh</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Data Source Selection -->
+      <div class="section">
+        <div class="section-title">🗄️ Data Source</div>
+        <div class="input-group">
+          <span class="input-icon">💾</span>
+          <select id="dataSource">
+            <option value="overpass">Overpass API (OSM)</option>
+            <option value="geoserver_wfs">GeoServer (GeoJSON WFS)</option>
+            <option value="all">All Sources</option>
+          </select>
+        </div>
+        <div id="sourceInfo" style="font-size: 11px; color: #94a3b8; margin-top: 8px;"></div>
+      </div>
+
+      <!-- Statistics -->
+      <div class="section">
+        <div class="section-title">📊 Statistics</div>
+        <div class="stat-card">
+          <div class="stat-value" id="statPlaces">0</div>
+          <div class="stat-label">Places Found</div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="stat-card">
+            <div class="stat-value" id="statNearest">-</div>
+            <div class="stat-label">Nearest (m)</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="statRadius">5</div>
+            <div class="stat-label">Radius (km)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Service Types Filters -->
+      <div class="section">
+        <div class="section-title">🏥 Service Types</div>
+        <div class="filter-grid">
+          <label class="filter-btn active">
+            <input type="checkbox" class="filter" value="hospital" checked>
+            <span>🏥 Hospital</span>
+          </label>
+          <label class="filter-btn active">
+            <input type="checkbox" class="filter" value="clinic" checked>
+            <span>⚕️ Clinic</span>
+          </label>
+          <label class="filter-btn active">
+            <input type="checkbox" class="filter" value="pharmacy" checked>
+            <span>💊 Pharmacy</span>
+          </label>
+          <label class="filter-btn active">
+            <input type="checkbox" class="filter" value="police" checked>
+            <span>👮 Police</span>
+          </label>
+          <label class="filter-btn active">
+            <input type="checkbox" class="filter" value="fire_station" checked>
+            <span>🚒 Fire</span>
+          </label>
+          <label class="filter-btn active">
+            <input type="checkbox" class="filter" value="ambulance_station" checked>
+            <span>🚑 Ambulance</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Places List -->
+      <div class="section">
+        <div class="section-title">📍 Nearby Places (<span id="placesCount">0</span>)</div>
+        <div id="placesList" style="max-height: 400px; overflow-y: auto;"></div>
+      </div>
+
+      <!-- Radius Slider -->
+      <div class="section">
+        <div class="section-title">🎯 Search Radius</div>
+        <div style="margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; color: #cbd5e1;">
+            <span>Range</span>
+            <span id="radiusVal" style="font-weight: bold; color: #60a5fa;">5000 m</span>
+          </div>
+          <input id="radius" type="range" min="1000" max="15000" step="500" value="5000" style="width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; outline: none; appearance: none;">
+        </div>
+      </div>
+
+      <!-- Map Tools -->
+      <div class="section">
+        <div class="section-title">🧭 Map Tools & Routing</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div id="clickInfo" style="font-size:13px;color:#cbd5e1">Click map to detect area & nearest service</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <label style="display:flex;gap:6px;align-items:center;color:#cbd5e1;cursor:pointer">
+              <input id="autoRoute" type="checkbox" checked> Auto-route to nearest
+            </label>
+            <label style="display:flex;gap:6px;align-items:center;color:#cbd5e1;cursor:pointer">
+              <input id="simulateTraffic" type="checkbox"> Simulate traffic delay
+            </label>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <label style="display:flex;gap:6px;align-items:center;color:#cbd5e1">Travel Mode:
+              <select id="travelMode" style="margin-left:6px;background:rgba(255,255,255,0.06);color:#e6eef8;border-radius:6px;padding:4px 8px;border:1px solid rgba(255,255,255,0.1);">
+                <option value="driving">🚗 Driving</option>
+                <option value="walking">🚶 Walking</option>
+                <option value="cycling">🚴 Cycling</option>
+              </select>
+            </label>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <label style="display:flex;gap:6px;align-items:center;color:#cbd5e1">Route To:
+              <select id="routeToType" style="margin-left:6px;background:rgba(255,255,255,0.06);color:#e6eef8;border-radius:6px;padding:4px 8px;border:1px solid rgba(255,255,255,0.1);">
+                <option value="any">Any (Nearest)</option>
+                <option value="hospital">🏥 Hospital</option>
+                <option value="clinic">⚕️ Clinic</option>
+                <option value="pharmacy">💊 Pharmacy</option>
+                <option value="police">👮 Police</option>
+                <option value="fire_station">🚒 Fire Station</option>
+                <option value="ambulance_station">🚑 Ambulance</option>
+              </select>
+            </label>
+          </div>
+          <!-- Manual marker controls -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+            <button id="btnPlaceMarker" class="btn btn-secondary" style="padding:8px;font-size:13px;">
+              <span>📍</span>
+              <span>Place Marker</span>
+            </button>
+            <button id="btnClearMarker" class="btn btn-secondary" style="padding:8px;font-size:13px;">
+              <span>🗑️</span>
+              <span>Clear Marker</span>
+            </button>
+          </div>
+          <button id="btnClearRoute" class="btn btn-secondary" style="width:100%;padding:8px;font-size:13px;">
+            <span>❌</span>
+            <span>Clear Route</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Find Nearest Tool -->
+      <div class="section">
+        <div class="section-title">🎯 Find Nearest Facility</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <label style="display:flex;gap:6px;align-items:center;color:#cbd5e1">Facility Type:
+            <select id="nearestFacilityType" style="flex:1;margin-left:6px;background:rgba(255,255,255,0.06);color:#e6eef8;border-radius:6px;padding:6px 8px;border:1px solid rgba(255,255,255,0.1);">
+              <option value="any">Any Service</option>
+              <option value="hospital">🏥 Hospital</option>
+              <option value="clinic">⚕️ Clinic</option>
+              <option value="pharmacy">💊 Pharmacy</option>
+              <option value="police">👮 Police</option>
+              <option value="fire_station">🚒 Fire Station</option>
+              <option value="ambulance_station">🚑 Ambulance</option>
+            </select>
+          </label>
+          <button id="btnNearest" class="btn btn-primary" style="width:100%;">
+            <span>📏</span>
+            <span>Find & Route to Nearest</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Analysis Tools - REMOVED
+      <div class="section">
+        <div class="section-title">🧮 Analysis Tools</div>
+        <button id="btnHeatmap" class="btn btn-secondary" style="width: 100%; margin-bottom: 8px;">
+          <span>🔥</span>
+          <span>Generate Heatmap</span>
+        </button>
+        <button id="btnBuffer" class="btn btn-secondary" style="width: 100%; margin-bottom: 8px;">
+          <span>⭕</span>
+          <span>Buffer Analysis</span>
+        </button>
+        <button id="btnNearest" class="btn btn-secondary" style="width: 100%;">
+          <span>📏</span>
+          <span>Find Nearest Facility</span>
+        </button>
+      </div>
+      -->
+
+      <!-- Legend -->
+      <div class="section">
+        <div class="section-title">🎨 Legend</div>
+        <div id="legend" style="display:grid;grid-template-columns:1fr;gap:8px;"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Map -->
+  <div id="map"></div>
+</div>
+
+<!-- Chatbot -->
+<div id="chatbot" class="minimized">
+  <div class="chat-header" onclick="toggleChatbot()">
+    <div class="chat-icon">
+      🤖
+    </div>
+    <div class="chat-header-content">
+      <div style="font-weight: 700; font-size: 16px; color: white;">🤖 Emergency Assistant</div>
+      <div class="chat-status">
+        <div class="status-dot"></div>
+        <span id="aiStatusIndicator">Online & Ready</span>
+      </div>
+    </div>
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <button class="chat-clear-btn" onclick="event.stopPropagation(); clearChat()" title="Clear chat" style="color: white;">🗑️</button>
+      <div style="font-size: 20px; cursor: pointer; color: white;" id="chatToggleIcon">▲</div>
+    </div>
+  </div>
+  <div class="chat-messages" id="chatMessages">
+    <div class="chat-message bot">
+      👋 <b style="color: white;">Hello! I'm your Emergency Services AI Assistant.</b>
+      
+      I can help you with:
+      
+      🏥 Finding medical facilities
+      🚨 Emergency contact information  
+      📊 Area statistics & analysis
+      🗺️ Navigation & directions
+      💾 Data export & management
+      
+      <b style="color: white;">Try asking me something!</b>
+      <div class="quick-actions">
+        <button class="quick-action-btn" onclick="askBot('Find nearest hospital')">🏥 Hospital</button>
+        <button class="quick-action-btn" onclick="askBot('Show emergency numbers')">📞 Emergency</button>
+        <button class="quick-action-btn" onclick="askBot('Show statistics')">📊 Statistics</button>
+        <button class="quick-action-btn" onclick="askBot('Where am I')">📍 Location</button>
+      </div>
+    </div>
+  </div>
+  <div class="chat-input-container">
+    <input type="text" id="chatInput" class="chat-input" placeholder="Type your message..." onkeypress="if(event.key==='Enter') sendMessage()">
+    <button class="chat-send-btn" onclick="sendMessage()">
+      <span>Send</span>
+    </button>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+
+<script>
+// ===========================================
+// CONFIGURATION & INITIALIZATION
+// ===========================================
+
+// IMPORTANT: Configure these URLs for your environment
+const CONFIG = {
+  postgis: {
+    url: 'http://localhost:3000/api/places',
+    enabled: false
+  },
+  geoserver: {
+    url: 'http://localhost:8080/geoserver/emergency/wms',
+    layer: 'emergency:services',
+    wfsUrl: '/proxy-wfs', // Use the same-origin proxy to avoid CORS issues
+    enabled: false
+  },
+  ai: {
+    // Choose your AI provider: 'groq', 'openai', 'huggingface'
+    provider: 'groq',
+    // Set your API key locally before using AI features
+    apiKey: '',
+    // For OpenAI: https://platform.openai.com/api-keys
+    // For Hugging Face: https://huggingface.co/settings/tokens
+    model: 'openai/gpt-oss-120b' // Groq model
+  }
+};
+
+// Initialize Map
+const map = L.map('map').setView([31.5204, 74.3587], 13);
+
+// Define multiple base layers
+const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors',
+  maxZoom: 19,
+  name: 'OpenStreetMap'
+});
+
+const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Tiles © Esri',
+  maxZoom: 18,
+  name: 'Satellite'
+});
+
+const darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '© OpenStreetMap, © CartoDB',
+  maxZoom: 19,
+  name: 'Dark Mode'
+});
+
+const lightLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  attribution: '© OpenStreetMap, © CartoDB',
+  maxZoom: 19,
+  name: 'Light Mode'
+});
+
+// Set default layer
+osmLayer.addTo(map);
+
+// Create layer control
+const baseLayers = {
+  'OpenStreetMap': osmLayer,
+  'Satellite': satelliteLayer,
+  'Dark Mode': darkLayer,
+  'Light Mode': lightLayer
+};
+
+// Add regional overlays
+const pakistanBounds = L.latLngBounds(
+  [23.6345, 60.8471], // SW corner
+  [37.0841, 77.8374]  // NE corner
+);
+
+const lahoreBounds = L.latLngBounds(
+  [31.4204, 74.1585], // SW corner
+  [31.6404, 74.3987]  // NE corner
+);
+
+// Add visual boundary rectangles
+const pakistanBoundary = L.rectangle(pakistanBounds, {
+  color: '#3b82f6',
+  weight: 2,
+  opacity: 0.3,
+  fillOpacity: 0,
+  dashArray: '5, 5',
+  interactive: false
+});
+
+const lahoreBoundary = L.rectangle(lahoreBounds, {
+  color: '#10b981',
+  weight: 2,
+  opacity: 0.5,
+  fillOpacity: 0,
+  dashArray: '3, 3',
+  interactive: false
+}).addTo(map);
+
+// Create overlay layers control
+const overlays = {
+  'Pakistan Boundary': pakistanBoundary,
+  'Lahore Area': lahoreBoundary
+};
+
+// Update layer control with overlays
+L.control.layers(baseLayers, overlays).addTo(map);
+
+// Coordinate display control - TOP RIGHT
+const coordControl = L.control({ position: 'topright' });
+coordControl.onAdd = function() {
+  const div = L.DomUtil.create('div', 'coord-control');
+  div.innerHTML = 'Lat: — Lon: —';
+  return div;
+};
+coordControl.addTo(map);
+
+map.on('mousemove', function(e) {
+  const lat = e.latlng.lat.toFixed(5);
+  const lng = e.latlng.lng.toFixed(5);
+  const el = document.querySelector('.coord-control');
+  if (el) el.innerHTML = `Lat: ${lat} Lon: ${lng}`;
+});
+
+// Drawing tools
+const drawnItems = new L.FeatureGroup();
+map.addLayer(drawnItems);
+
+const drawControl = new L.Control.Draw({
+  draw: {
+    polygon: true,
+    polyline: true,
+    rectangle: true,
+    circle: true,
+    marker: true,
+    circlemarker: false
+  },
+  edit: {
+    featureGroup: drawnItems,
+    remove: true
+  }
+});
+
+// Variables
+const cluster = L.markerClusterGroup({
+  iconCreateFunction: function(cluster) {
+    const count = cluster.getChildCount();
+    return L.divIcon({
+      html: `<div style="background:linear-gradient(135deg,#3b82f6,#2563eb);color:white;border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-weight:700;box-shadow:0 4px 12px rgba(0,0,0,0.3);">${count}</div>`,
+      className: ''
+    });
+  }
+}).addTo(map);
+
+let userMarker, radiusCircle;
+let userPos = null;
+let allPlaces = [];
+let displayedPlaces = [];
+let geoserverLayer = null;
+let geoserverGeojsonLayer = null;
+let heatmapLayer = null;
+let measureControl = null;
+let manualMarker = null;
+let manualCircle = null;
+let placeMarkerMode = false;
+let lastRouteRequestId = 0;
+let currentRouteLayer = null;
+let currentRouteInfo = null;
+let darkMode = false;
+let currentBaseLayer = osmLayer;
+// let darkMode = false;
+// let currentBaseLayer = osmLayer;
+
+// ===========================================
+// CHATBOT FUNCTIONALITY
+// ===========================================
+
+let chatHistory = [];
+let isTyping = false;
+
+// Check AI configuration on load
+function checkAIStatus() {
+  const statusElement = document.getElementById('aiStatusIndicator');
+  if (CONFIG.ai.apiKey && CONFIG.ai.apiKey.length > 10) {
+    statusElement.innerHTML = `<span style="color: #4ade80;">✨ AI-Powered (${CONFIG.ai.model.split('-')[0]})</span>`;
+    return true;
+  } else {
+    statusElement.innerHTML = 'Rule-Based Mode';
+    console.log('%c⚠️ AI Chatbot Disabled - Using Rule-Based Responses', 'color: #fb923c; font-weight: bold; font-size: 14px;');
+    console.log('🔑 To enable AI: Add your Groq API key in CONFIG.ai.apiKey');
+    return false;
+  }
+}
+
+// Run AI check when page loads
+setTimeout(checkAIStatus, 500);
+
+function toggleChatbot() {
+  const chatbot = document.getElementById('chatbot');
+  const icon = document.getElementById('chatToggleIcon');
+  chatbot.classList.toggle('minimized');
+  
+  if (chatbot.classList.contains('minimized')) {
+    icon.textContent = '▲';
+  } else {
+    icon.textContent = '▼';
+    document.getElementById('chatInput').focus();
+  }
+}
+
+function clearChat() {
+  const container = document.getElementById('chatMessages');
+  container.innerHTML = '';
+  chatHistory = [];
+  
+  // Add welcome message
+  addChatMessage('Chat cleared! How can I help you today?', 'bot');
+  addSystemMessage('💡 Tip: Try "Find nearest hospital" or "Show emergency numbers"');
+}
+
+function sendMessage() {
+  const input = document.getElementById('chatInput');
+  const msg = input.value.trim();
+  if (!msg || isTyping) return;
+  
+  addChatMessage(msg, 'user');
+  chatHistory.push({role: 'user', message: msg});
+  input.value = '';
+  
+  // Show typing indicator
+  showTypingIndicator();
+  
+  // Process message with realistic delay
+  setTimeout(() => {
+    hideTypingIndicator();
+    processMessage(msg);
+  }, 800 + Math.random() * 400);
+}
+
+function askBot(question) {
+  document.getElementById('chatInput').value = question;
+  sendMessage();
+}
+
+function addChatMessage(text, sender) {
+  const container = document.getElementById('chatMessages');
+  const div = document.createElement('div');
+  div.className = `chat-message ${sender}`;
+  div.innerHTML = text;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  
+  chatHistory.push({role: sender, message: text});
+}
+
+function addSystemMessage(text) {
+  const container = document.getElementById('chatMessages');
+  const div = document.createElement('div');
+  div.className = 'chat-message system';
+  div.textContent = text;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function showTypingIndicator() {
+  isTyping = true;
+  const container = document.getElementById('chatMessages');
+  const indicator = document.createElement('div');
+  indicator.id = 'typingIndicator';
+  indicator.className = 'typing-indicator';
+  indicator.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
+  container.appendChild(indicator);
+  container.scrollTop = container.scrollHeight;
+}
+
+function hideTypingIndicator() {
+  isTyping = false;
+  const indicator = document.getElementById('typingIndicator');
+  if (indicator) indicator.remove();
+}
+
+function processMessage(msg) {
+  const lower = msg.toLowerCase();
+  let response = '';
+  let hasAction = false;
+  
+  // Try to get AI response first if API key is configured
+  if (CONFIG.ai.apiKey) {
+    // AI will handle the response asynchronously
+    queryAIModel(msg).then(aiResponse => {
+      if (aiResponse) {
+        hideTypingIndicator();
+        addChatMessage(aiResponse, 'bot');
+        setTimeout(() => {
+          addQuickActions();
+        }, 500);
+      } else {
+        // Fallback to rule-based chatbot
+        hideTypingIndicator();
+        processRuleBasedResponse(msg);
+      }
+    });
+    return;
+  }
+  
+  // Use rule-based chatbot if no AI is configured
+  hideTypingIndicator();
+  processRuleBasedResponse(msg);
+}
+
+function processRuleBasedResponse(msg) {
+  const lower = msg.toLowerCase();
+  let response = '';
+  let hasAction = false;
+  
+  // Hospital queries
+  if (lower.includes('nearest hospital') || (lower.includes('hospital') && lower.includes('find'))) {
+    const hospitals = allPlaces.filter(p => p.type === 'hospital');
+    if (hospitals.length > 0) {
+      const h = hospitals[0];
+      response = `🏥 Found ${hospitals.length} hospital(s).\n\nNearest: "${h.name}"\n📏 Distance: ${h.dist}m (${(h.dist/1000).toFixed(2)}km)\n⏱️ ~${Math.ceil(h.dist/83)} min walk\n\nShowing location on map...`;
+      map.flyTo([h.lat, h.lon], 17, { animate: true, duration: 1.5 });
+      setTimeout(() => {
+        const marker = findMarkerByCoords(h.lat, h.lon);
+        if (marker) marker.openPopup();
+      }, 1500);
+      hasAction = true;
+    } else {
+      response = '❌ No hospitals found in current search area.\n\n💡 Try:\n• Increasing search radius\n• Moving to a different location\n• Checking if filters are enabled';
+    }
+  }
+  // All hospitals list
+  else if (lower.includes('all hospital') || lower.includes('list hospital')) {
+    const hospitals = allPlaces.filter(p => p.type === 'hospital');
+    if (hospitals.length > 0) {
+      response = `🏥 Found ${hospitals.length} Hospital(s):\n\n`;
+      hospitals.slice(0, 5).forEach((h, i) => {
+        response += `${i+1}. ${h.name}\n   📏 ${h.dist}m away\n`;
+      });
+      if (hospitals.length > 5) response += `\n... and ${hospitals.length - 5} more`;
+    } else {
+      response = 'No hospitals found in the area.';
+    }
+  }
+  // Emergency numbers
+  else if (lower.includes('emergency') && (lower.includes('number') || lower.includes('call') || lower.includes('contact'))) {
+    response = `🚨 EMERGENCY CONTACTS (Pakistan):\n\n🚑 Ambulance: 1122\n👮 Police: 15\n🚒 Fire Brigade: 16\n🆘 Rescue Services: 1122\n☎️ Edhi Foundation: 115\n🏥 Aga Khan Emergency: (021) 111-911-911\n\n⚠️ For life-threatening emergencies, call immediately!`;
+  }
+  // Pharmacy queries
+  else if (lower.includes('pharmac') || lower.includes('medicine') || lower.includes('drug')) {
+    const pharmacies = allPlaces.filter(p => p.type === 'pharmacy');
+    if (pharmacies.length > 0) {
+      const p = pharmacies[0];
+      response = `💊 Found ${pharmacies.length} pharmacy/pharmacies.\n\nNearest: "${p.name}"\n📏 ${p.dist}m away\n\nNavigating to location...`;
+      map.flyTo([p.lat, p.lon], 17, { animate: true, duration: 1.5 });
+      hasAction = true;
+    } else {
+      response = '💊 No pharmacies found nearby. Try expanding your search radius.';
+    }
+  }
+  // Police queries
+  else if (lower.includes('police') || lower.includes('thana')) {
+    const police = allPlaces.filter(p => p.type === 'police');
+    if (police.length > 0) {
+      const p = police[0];
+      response = `👮 Found ${police.length} police station(s).\n\nNearest: "${p.name}"\n📏 ${p.dist}m away\n\n🚨 For emergencies, call 15\n\nShowing on map...`;
+      map.flyTo([p.lat, p.lon], 17, { animate: true, duration: 1.5 });
+      hasAction = true;
+    } else {
+      response = '👮 No police stations found in current area. Emergency number: 15';
+    }
+  }
+  // Fire station queries
+  else if (lower.includes('fire')) {
+    const fire = allPlaces.filter(p => p.type === 'fire_station');
+    if (fire.length > 0) {
+      const f = fire[0];
+      response = `🚒 Found ${fire.length} fire station(s).\n\nNearest: "${f.name}"\n📏 ${f.dist}m away\n\n🔥 For fire emergencies, call 16\n\nLocating...`;
+      map.flyTo([f.lat, f.lon], 17, { animate: true, duration: 1.5 });
+      hasAction = true;
+    } else {
+      response = '🚒 No fire stations found nearby. Emergency number: 16';
+    }
+  }
+  // Clinic queries
+  else if (lower.includes('clinic') || lower.includes('doctor')) {
+    const clinics = allPlaces.filter(p => p.type === 'clinic');
+    if (clinics.length > 0) {
+      const c = clinics[0];
+      response = `⚕️ Found ${clinics.length} clinic(s).\n\nNearest: "${c.name}"\n📏 ${c.dist}m away\n\nShowing location...`;
+      map.flyTo([c.lat, c.lon], 17, { animate: true, duration: 1.5 });
+      hasAction = true;
+    } else {
+      response = '⚕️ No clinics found. Try searching for hospitals instead.';
+    }
+  }
+  // Statistics queries
+  else if (lower.includes('how many') || lower.includes('count') || lower.includes('statistic')) {
+    const stats = {};
+    allPlaces.forEach(p => {
+      stats[p.type] = (stats[p.type] || 0) + 1;
+    });
+    response = `📊 AREA STATISTICS:\n\nTotal Services: ${allPlaces.length}\n\n`;
+    Object.entries(stats).forEach(([type, count]) => {
+      const emoji = {hospital:'🏥',clinic:'⚕️',pharmacy:'💊',police:'👮',fire_station:'🚒',ambulance_station:'🚑'}[type] || '📍';
+      response += `${emoji} ${type}: ${count}\n`;
+    });
+    response += `\n🎯 Search Radius: ${(parseInt(document.getElementById('radius').value)/1000).toFixed(1)}km`;
+  }
+  // Distance/route queries
+  else if (lower.includes('how far') || lower.includes('distance to')) {
+    if (allPlaces.length > 0) {
+      const nearest = allPlaces[0];
+      response = `📏 DISTANCE INFO:\n\nNearest service: "${nearest.name}"\nType: ${nearest.type}\nDistance: ${nearest.dist}m (${(nearest.dist/1000).toFixed(2)}km)\n\n🚶 Walk: ~${Math.ceil(nearest.dist/83)} min\n🚗 Drive: ~${Math.ceil(nearest.dist/333)} min`;
+    } else {
+      response = 'No services found to calculate distance. Try locating yourself first.';
+    }
+  }
+  // Location queries
+  else if (lower.includes('where am i') || lower.includes('my location')) {
+    if (userPos) {
+      response = `📍 YOUR LOCATION:\n\nLatitude: ${userPos.lat.toFixed(5)}\nLongitude: ${userPos.lng.toFixed(5)}\n\n✅ Location services active\n🎯 Tracking ${allPlaces.length} nearby services`;
+    } else {
+      response = '❌ Location not available. Click "Locate Me" button to enable GPS.';
+    }
+  }
+  // Filter/search queries
+  else if (lower.includes('show only') || lower.includes('filter')) {
+    response = '🔍 FILTER OPTIONS:\n\nYou can filter by:\n🏥 Hospitals\n⚕️ Clinics\n💊 Pharmacies\n👮 Police Stations\n🚒 Fire Stations\n🚑 Ambulance Stations\n\nUse the checkboxes in the sidebar to toggle filters!';
+  }
+  // Radius queries
+  else if (lower.includes('increase radius') || lower.includes('expand search')) {
+    const currentRadius = parseInt(document.getElementById('radius').value);
+    const newRadius = Math.min(currentRadius + 2000, 15000);
+    document.getElementById('radius').value = newRadius;
+    document.getElementById('radiusVal').textContent = newRadius + ' m';
+    if (radiusCircle) radiusCircle.setRadius(newRadius);
+    fetchNearby(userPos);
+    response = `🎯 Search radius expanded to ${(newRadius/1000).toFixed(1)}km. Refreshing results...`;
+    hasAction = true;
+  }
+  else if (lower.includes('decrease radius') || lower.includes('reduce search')) {
+    const currentRadius = parseInt(document.getElementById('radius').value);
+    const newRadius = Math.max(currentRadius - 2000, 1000);
+    document.getElementById('radius').value = newRadius;
+    document.getElementById('radiusVal').textContent = newRadius + ' m';
+    if (radiusCircle) radiusCircle.setRadius(newRadius);
+    fetchNearby(userPos);
+    response = `🎯 Search radius reduced to ${(newRadius/1000).toFixed(1)}km. Refreshing results...`;
+    hasAction = true;
+  }
+  // Search specific place
+  else if (lower.includes('search for') || lower.includes('find ')) {
+    const searchTerm = msg.replace(/search for|find/gi, '').trim();
+    if (searchTerm) {
+      const results = allPlaces.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+      if (results.length > 0) {
+        response = `🔍 Found ${results.length} result(s) for "${searchTerm}":\n\n`;
+        results.slice(0, 3).forEach((r, i) => {
+          response += `${i+1}. ${r.name} (${r.type})\n   📏 ${r.dist}m away\n`;
+        });
+        map.flyTo([results[0].lat, results[0].lon], 16);
+        hasAction = true;
+      } else {
+        response = `🔍 No results found for "${searchTerm}". Try different keywords.`;
+      }
+    }
+  }
+  // Refresh data
+  else if (lower.includes('refresh') || lower.includes('reload') || lower.includes('update')) {
+    fetchNearby(userPos);
+    response = '🔄 Refreshing data... Please wait.';
+    hasAction = true;
+  }
+  // Export data
+  else if (lower.includes('export') || lower.includes('download') || lower.includes('save data')) {
+    if (allPlaces.length > 0) {
+      // Manual export via CSV generation
+      const csv = 'Name,Type,Latitude,Longitude,Distance(m)\n' + 
+        allPlaces.map(p => `"${p.name}",${p.type},${p.lat},${p.lon},${p.dist}`).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'emergency_services.csv';
+      a.click();
+      response = `💾 Exporting ${allPlaces.length} records to CSV file...\n\n✅ Download should start automatically!`;
+      hasAction = true;
+    } else {
+      response = '❌ No data to export. Search for services first.';
+    }
+  }
+  // Help and capabilities
+  else if (lower.includes('help') || lower.includes('what can you') || lower.includes('capabilities')) {
+    response = `🤖 I'M YOUR EMERGENCY ASSISTANT!\n\nI can help you with:\n\n🏥 "Find nearest hospital"\n💊 "Show pharmacies"\n👮 "Where is police station"\n🚨 "Emergency numbers"\n📊 "Show statistics"\n📏 "How far is nearest service"\n📍 "Where am I"\n🎯 "Increase/decrease radius"\n🔍 "Search for [name]"\n💾 "Export data"\n🔄 "Refresh"\n\nJust ask me anything!`;
+  }
+  // Smart greeting responses
+  else if (lower.includes('hello') || lower.includes('hi ') || lower === 'hi' || lower.includes('hey')) {
+    response = `👋 Hello! I'm your Emergency Services Assistant.\n\n🚨 Need urgent help? Try:\n• "Nearest hospital"\n• "Emergency numbers"\n• "Find police station"\n\nHow can I assist you today?`;
+  }
+  else if (lower.includes('thank') || lower.includes('thanks')) {
+    response = `You're welcome! 😊\n\nStay safe and feel free to ask if you need anything else!\n\n🚨 Remember: For emergencies, always call:\n🚑 1122 (Ambulance/Rescue)\n👮 15 (Police)`;
+  }
+  else if (lower.includes('good') || lower.includes('great') || lower.includes('awesome')) {
+    response = `Thank you! 🙏 I'm here to help keep you safe.\n\nNeed anything else? Just ask!`;
+  }
+  // No match - smart suggestions
+  else {
+    response = `🤔 I'm not sure about "${msg}".\n\n💡 You can try:\n• "Nearest hospital" - Find closest medical facility\n• "Emergency numbers" - Get emergency contacts\n• "Show statistics" - View area data\n• "Help" - See all my capabilities\n\nWhat would you like to know?`;
+  }
+  
+  addChatMessage(response, 'bot');
+  
+  // Add contextual quick actions after response
+  if (!hasAction) {
+    setTimeout(() => {
+      addQuickActions();
+    }, 500);
+  }
+}
+
+function findMarkerByCoords(lat, lon) {
+  let foundMarker = null;
+  cluster.eachLayer(marker => {
+    const pos = marker.getLatLng();
+    if (Math.abs(pos.lat - lat) < 0.0001 && Math.abs(pos.lng - lon) < 0.0001) {
+      foundMarker = marker;
+    }
+  });
+  return foundMarker;
+}
+
+function addQuickActions() {
+  const container = document.getElementById('chatMessages');
+  const existingActions = container.querySelector('.quick-actions');
+  if (existingActions) return; // Don't add duplicates
+  
+  const actionsDiv = document.createElement('div');
+  actionsDiv.className = 'chat-message bot';
+  actionsDiv.innerHTML = `
+    <div style="font-size: 12px; margin-bottom: 8px;">Quick Actions:</div>
+    <div class="quick-actions">
+      <button class="quick-action-btn" onclick="askBot('Find nearest hospital')">🏥 Hospital</button>
+      <button class="quick-action-btn" onclick="askBot('Show emergency numbers')">📞 Emergency</button>
+      <button class="quick-action-btn" onclick="askBot('Show statistics')">📊 Stats</button>
+      <button class="quick-action-btn" onclick="askBot('Nearest pharmacy')">💊 Pharmacy</button>
+    </div>
+  `;
+  container.appendChild(actionsDiv);
+  container.scrollTop = container.scrollHeight;
+}
+
+// ===========================================
+// DATA SOURCE FUNCTIONS
+// ===========================================
+
+async function fetchFromPostGIS(lat, lon, radius) {
+  if (!CONFIG.postgis.enabled) {
+    return [];
+  }
+  
+  try {
+    const types = getSelectedTypes();
+    const response = await fetch(`${CONFIG.postgis.url}?lat=${lat}&lon=${lon}&radius=${radius}&types=${types.join(',')}`);
+    const data = await response.json();
+    return data.places || [];
+  } catch (err) {
+    console.error('PostGIS fetch error:', err);
+    setStatus('PostGIS connection failed, using Overpass', 'warning');
+    return [];
+  }
+}
+
+function loadGeoServerLayer() {
+  if (!CONFIG.geoserver.enabled) {
+    return;
+  }
+  
+  if (geoserverLayer) {
+    map.removeLayer(geoserverLayer);
+  }
+  
+  geoserverLayer = L.tileLayer.wms(CONFIG.geoserver.url, {
+    layers: CONFIG.geoserver.layer,
+    format: 'image/png',
+    transparent: true,
+    attribution: 'GeoServer Data'
+  }).addTo(map);
+  
+  setStatus('GeoServer layer loaded', 'success');
+}
+
+// Fetch GeoServer WFS (GeoJSON) and convert to internal places format
+async function fetchFromGeoServerWFS(lat, lon, radius) {
+  const url = CONFIG.geoserver.wfsUrl;
+  if (!url) {
+    setStatus('GeoServer WFS URL not configured', 'error');
+    return [];
+  }
+  try {
+    const res = await fetch(url);
+    const geojson = await res.json();
+    const features = Array.isArray(geojson.features) ? geojson.features : [];
+    // Map GeoJSON features to {lat, lon, name, type, source}
+    const places = features.map(f => {
+      const coords = f.geometry && f.geometry.type === 'Point' ? f.geometry.coordinates : null;
+      const props = f.properties || {};
+      return coords ? {
+        lat: coords[1],
+        lon: coords[0],
+        name: props.name || 'Unknown',
+        type: props.type || props.amenity || 'unknown',
+        source: 'geoserver'
+      } : null;
+    }).filter(Boolean);
+    return places;
+  } catch (e) {
+    console.error('GeoServer WFS fetch error:', e);
+    setStatus('GeoServer WFS fetch failed', 'error');
+    return [];
+  }
+}
+
+async function fetchFromOverpass(lat, lon, radius) {
+  const query = buildOverpassQuery(lat, lon, radius);
+  if (!query) return [];
+  
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
+    const res = await fetch("https://overpass-api.de/api/interpreter", {
+      method: "POST",
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+      body: new URLSearchParams({ data: query }),
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!res.ok) {
+      console.warn(`Overpass API returned ${res.status}: ${res.statusText}. Using mock data.`);
+      setStatus(`Overpass API unavailable (${res.status}). Showing sample data.`, 'warning');
+      return getMockEmergencyData(lat, lon, radius);
+    }
+    
+    const contentType = res.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      console.warn('Overpass API returned non-JSON response. Using mock data.');
+      setStatus('Overpass API unavailable. Showing sample data.', 'warning');
+      return getMockEmergencyData(lat, lon, radius);
+    }
+    
+    const data = await res.json();
+    return (data.elements || []).map(e => ({
+      lat: e.lat || (e.center && e.center.lat),
+      lon: e.lon || (e.center && e.center.lon),
+      name: (e.tags && e.tags.name) || (e.tags && e.tags.amenity) || 'Unknown',
+      type: e.tags && e.tags.amenity,
+      source: 'overpass'
+    })).filter(p => p.lat && p.lon);
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      console.warn('Overpass API request timeout. Using mock data.');
+      setStatus('Overpass API timeout. Showing sample data.', 'warning');
+    } else {
+      console.error('Overpass error:', err);
+      setStatus('Data service unavailable. Using sample data.', 'warning');
+    }
+    return getMockEmergencyData(lat, lon, radius);
+  }
+}
+
+// Fallback mock data for when Overpass API is unavailable
+function getMockEmergencyData(lat, lon, radius) {
+  const mockData = [
+    { lat: 31.5204, lon: 74.3587, name: 'Mayo Hospital', type: 'hospital', source: 'mock' },
+    { lat: 31.5254, lon: 74.3687, name: 'Jinnah Hospital', type: 'hospital', source: 'mock' },
+    { lat: 31.5154, lon: 74.3487, name: 'Sharif Medical City', type: 'clinic', source: 'mock' },
+    { lat: 31.5304, lon: 74.3787, name: 'City Pharmacy', type: 'pharmacy', source: 'mock' },
+    { lat: 31.5104, lon: 74.3387, name: 'Lahore Police Station', type: 'police', source: 'mock' },
+    { lat: 31.5354, lon: 74.3537, name: 'Fire Station 1', type: 'fire_station', source: 'mock' },
+    { lat: 31.5254, lon: 74.3387, name: 'Rescue Station', type: 'ambulance_station', source: 'mock' },
+    { lat: 31.5404, lon: 74.3687, name: 'United Hospital', type: 'hospital', source: 'mock' },
+    { lat: 31.5104, lon: 74.3687, name: 'Doctors Hospital', type: 'clinic', source: 'mock' },
+    { lat: 31.5354, lon: 74.3387, name: 'Health Plus Pharmacy', type: 'pharmacy', source: 'mock' }
+  ];
+  
+  // Filter data within radius
+  return mockData.filter(p => {
+    const dist = distance(lat, lon, p.lat, p.lon);
+    return dist <= radius;
+  });
+}
+
+function buildOverpassQuery(lat, lon, r) {
+  const checked = getSelectedTypes();
+  if (checked.length === 0) return null;
+  
+  return `[out:json][timeout:25];(node(around:${r},${lat},${lon})[amenity~"${checked.join('|')}"];way(around:${r},${lat},${lon})[amenity~"${checked.join('|')}"];relation(around:${r},${lat},${lon})[amenity~"${checked.join('|')}"];);out center;`;
+}
+
+// ===========================================
+// ROUTING AND NAVIGATION FUNCTIONS
+// ===========================================
+
+// Helper: return active search center (manual marker if present, else user position)
+function getActiveCenter() {
+  if (manualMarker) return manualMarker.getLatLng();
+  return userPos;
+}
+
+// Route via OSRM public server
+async function routeTo(start, end, travelMode='driving') {
+  const reqId = ++lastRouteRequestId;
+  try {
+    // Clear previous route immediately
+    if (currentRouteLayer) {
+      map.removeLayer(currentRouteLayer);
+      currentRouteLayer = null;
+    }
+    currentRouteInfo = null;
+    
+    const coords = `${start.lng},${start.lat};${end.lng},${end.lat}`;
+    const url = `https://router.project-osrm.org/route/v1/${travelMode}/${coords}?overview=full&geometries=geojson&alternatives=false&steps=false`;
+    const res = await fetch(url);
+    const j = await res.json();
+    
+    if (!j.routes || !j.routes.length) return null;
+    
+    // If another route request started after this one, abandon drawing
+    if (reqId !== lastRouteRequestId) return null;
+    
+    const r = j.routes[0];
+    const geo = r.geometry;
+    const poly = L.geoJSON(geo, { 
+      style: { 
+        color: '#2563eb', 
+        weight: 5, 
+        opacity: 0.9,
+        dashArray: '10, 5'
+      } 
+    });
+    
+    // Check again before adding to map
+    if (reqId !== lastRouteRequestId) return null;
+    
+    poly.addTo(map);
+    currentRouteLayer = poly;
+    currentRouteInfo = { duration: r.duration, distance: r.distance };
+    
+    // If simulateTraffic checked, apply multiplier
+    const sim = document.getElementById('simulateTraffic')?.checked;
+    const multiplier = sim ? 1.35 : 1.0;
+    const secs = Math.round(r.duration * multiplier);
+    const mins = Math.round(secs / 60);
+    
+    const trafficNote = sim ? ' (with traffic)' : '';
+    
+    const popup = L.popup({ maxWidth: 300 })
+      .setLatLng([end.lat, end.lng])
+      .setContent(`<div style="font-size:14px;color:white;"><b>🚗 Route Found</b><br>📏 Distance: ${(r.distance/1000).toFixed(2)} km<br>⏱️ ETA: ${mins} min${trafficNote}<br>🚦 Mode: ${travelMode}</div>`)
+      .openOn(map);
+    
+    return { duration: r.duration, distance: r.distance };
+  } catch (e) {
+    console.error('Routing error', e);
+    setStatus('Routing failed', 'error');
+    return null;
+  }
+}
+
+function clearRoute() {
+  lastRouteRequestId++;
+  if (currentRouteLayer) { 
+    map.removeLayer(currentRouteLayer); 
+    currentRouteLayer = null; 
+  }
+  currentRouteInfo = null;
+  map.closePopup();
+  setStatus('Route cleared', 'success');
+}
+
+async function fetchNearby(center) {
+  const centerPos = center || userPos;
+  if (!centerPos) {
+    setStatus("📍 Location unavailable - Click 'Locate Me' button", 'error');
+    return;
+  }
+
+  const r = parseInt(document.getElementById('radius').value);
+  const source = document.getElementById('dataSource').value;
+  
+  setStatus("🔍 Searching nearby services...", 'warning');
+  cluster.clearLayers();
+  document.getElementById('placesList').innerHTML = "";
+  
+  let places = [];
+  
+  // Fetch from selected source
+  if (source === 'postgis' || source === 'all') {
+    const postgisPlaces = await fetchFromPostGIS(centerPos.lat, centerPos.lng, r);
+    places = places.concat(postgisPlaces);
+  }
+  
+  if (source === 'overpass' || source === 'all') {
+    const overpassPlaces = await fetchFromOverpass(centerPos.lat, centerPos.lng, r);
+    places = places.concat(overpassPlaces);
+  }
+  
+  if (source === 'geoserver') {
+    loadGeoServerLayer();
+  }
+  
+  if (source === 'geoserver_wfs') {
+    const wfsPlaces = await fetchFromGeoServerWFS(centerPos.lat, centerPos.lng, r);
+    places = places.concat(wfsPlaces);
+  }
+  
+  // Remove duplicates
+  places = Array.from(new Map(places.map(p => [`${p.lat}-${p.lon}`, p])).values());
+  
+  // Calculate distances
+  places = places.map(p => ({
+    ...p,
+    dist: Math.round(distance(centerPos.lat, centerPos.lng, p.lat, p.lon))
+  })).filter(p => p.dist <= r).sort((a, b) => a.dist - b.dist);
+  
+  allPlaces = places;
+  displayedPlaces = places;
+  
+  if (places.length === 0) {
+    setStatus("⚠️ No results found - Try increasing radius or moving location", 'warning');
+    updateStats(0, null);
+    document.getElementById('placesList').innerHTML = '<div style="color:#94a3b8;text-align:center;padding:20px;">📍 No emergency services found in this area.<br><br>Try:<br>• Increasing search radius<br>• Enabling service type filters<br>• Moving to another location</div>';
+    return;
+  }
+  
+  renderPlaces(places);
+  updateStats(places.length, places[0].dist);
+  setStatus(`Found ${places.length} places`, 'success');
+  updateSourceInfo(source, places.length);
+  
+  // Auto-route to nearest if enabled
+  try {
+    const auto = document.getElementById('autoRoute')?.checked;
+    const origin = getActiveCenter();
+    const mode = (document.getElementById('travelMode') && document.getElementById('travelMode').value) || 'driving';
+    const routeToType = document.getElementById('routeToType')?.value || 'any';
+    
+    if (auto && origin && displayedPlaces && displayedPlaces.length > 0) {
+      setStatus('Auto-routing to nearest...', 'warning');
+      
+      // Filter by selected type if not "any"
+      let targetPlace = displayedPlaces[0];
+      if (routeToType !== 'any') {
+        const filtered = displayedPlaces.filter(p => p.type === routeToType);
+        if (filtered.length > 0) {
+          targetPlace = filtered[0];
+        } else {
+          setStatus(`No ${routeToType} found, routing to nearest service`, 'warning');
+        }
+      }
+      
+      await routeTo(origin, { lat: targetPlace.lat, lng: targetPlace.lon }, mode);
+      setStatus(`Route to ${targetPlace.name} (${targetPlace.type})`, 'success');
+    }
+  } catch (e) {
+    console.error('Auto-route failed', e);
+  }
+}
+
+function updateSourceInfo(source, count) {
+  const info = document.getElementById('sourceInfo');
+  const sourceNames = {
+    overpass: 'OpenStreetMap',
+    postgis: 'PostGIS Database',
+    geoserver: 'GeoServer',
+    all: 'All Sources'
+  };
+  info.textContent = `📊 Loaded ${count} records from ${sourceNames[source]}`;
+}
+
+// ===========================================
+// RENDERING & UI FUNCTIONS
+// ===========================================
+
+function renderPlaces(places) {
+  cluster.clearLayers();
+  const list = document.getElementById('placesList');
+  list.innerHTML = "";
+  
+  if (places.length === 0) {
+    list.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:20px;">No matching places</div>';
+    return;
+  }
+
+  places.forEach((p, i) => {
+    const color = getColorForType(p.type);
+    const icon = L.divIcon({
+      html: `<div style="background:${color};color:white;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:3px solid white;box-shadow:0 4px 12px rgba(0,0,0,0.3);">${i + 1}</div>`,
+      className: ''
+    });
+
+    const marker = L.marker([p.lat, p.lon], { icon });
+    marker.bindPopup(`
+      <div class="popup-content">
+        <div class="popup-title">${p.name}</div>
+        <div class="popup-info">📍 ${p.type}</div>
+        <div class="popup-info">📏 ${p.dist} meters away</div>
+        <div class="popup-info">🗄️ Source: ${p.source || 'OSM'}</div>
+        <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;">
+          <a href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}" target="_blank" class="popup-btn">Google Maps</a>
+          <button id="routePopupBtn-${i}" class="popup-btn" style="background:#059669">Get Directions</button>
+        </div>
+      </div>
+    `);
+    
+    // Attach route handler when popup opens
+    marker.on('popupopen', function() {
+      const btn = document.getElementById(`routePopupBtn-${i}`);
+      if (btn) {
+        btn.addEventListener('click', async function(e) {
+          e.preventDefault();
+          const routeFrom = getActiveCenter();
+          if (!routeFrom) { 
+            setStatus('No origin available - locate or place a manual marker', 'error'); 
+            return; 
+          }
+          const mode = (document.getElementById('travelMode') && document.getElementById('travelMode').value) || 'driving';
+          await routeTo(routeFrom, { lat: p.lat, lng: p.lon }, mode);
+        });
+      }
+    });
+    
+    marker.on('click', function() {
+      map.flyTo([p.lat, p.lon], 17, { animate: true, duration: 1 });
+    });
+    
+    cluster.addLayer(marker);
+
+    const li = document.createElement('div');
+    li.className = "place-item";
+    li.innerHTML = `
+      <div class="place-name">${i + 1}. ${p.name}</div>
+      <div class="place-meta">
+        <span class="badge" style="background:${color}">${p.type}</span>
+        <span>📏 ${p.dist}m</span>
+      </div>
+      <div style="margin-top:8px;display:flex;gap:8px;">
+        <button class="btn btn-primary get-route-btn" style="padding:6px 8px;font-size:13px;">🚗 Route</button>
+        <button class="btn btn-secondary focus-btn" style="padding:6px 8px;font-size:13px;">🔍 Focus</button>
+      </div>
+    `;
+    
+    // List button handlers
+    li.querySelector('.focus-btn').addEventListener('click', function() {
+      map.flyTo([p.lat, p.lon], 17, { animate: true, duration: 1 });
+      marker.openPopup();
+    });
+    
+    li.querySelector('.get-route-btn').addEventListener('click', async function(e) {
+      e.stopPropagation();
+      const routeFrom = getActiveCenter();
+      if (!routeFrom) { 
+        setStatus('No origin available - locate or place a manual marker', 'error'); 
+        return; 
+      }
+      const mode = (document.getElementById('travelMode') && document.getElementById('travelMode').value) || 'driving';
+      await routeTo(routeFrom, { lat: p.lat, lng: p.lon }, mode);
+    });
+    
+    list.appendChild(li);
+  });
+}
+
+function getColorForType(type) {
+  const colors = {
+    hospital: '#ef4444',
+    clinic: '#059669',
+    pharmacy: '#7c3aed',
+    police: '#0891b2',
+    fire_station: '#ea580c',
+    ambulance_station: '#db2777'
+  };
+  return colors[type] || '#3b82f6';
+}
+
+function renderLegend() {
+  const types = ['hospital','clinic','pharmacy','police','fire_station','ambulance_station'];
+  const legend = document.getElementById('legend');
+  legend.innerHTML = '';
+  
+  types.forEach(t => {
+    const col = getColorForType(t);
+    const row = document.createElement('div');
+    row.style.display = 'flex';
+    row.style.alignItems = 'center';
+    row.style.gap = '8px';
+    row.innerHTML = `<div style="width:14px;height:14px;border-radius:3px;background:${col}"></div><div style="color:#cbd5e1;font-size:13px;text-transform:capitalize">${t.replace('_',' ')}</div>`;
+    legend.appendChild(row);
+  });
+}
+
+function setStatus(msg, type) {
+  type = type || 'success';
+  const icons = { success: '✅', error: '❌', warning: '⚠️' };
+  const status = document.getElementById('locationStatus');
+  status.innerHTML = `<span>${icons[type]}</span><span>${msg}</span>`;
+  status.className = `status-indicator status-${type}`;
+}
+
+function updateStats(count, nearest) {
+  document.getElementById('statPlaces').textContent = count;
+  document.getElementById('placesCount').textContent = count;
+  document.getElementById('statNearest').textContent = nearest || '-';
+  document.getElementById('statRadius').textContent = (parseInt(document.getElementById('radius').value) / 1000).toFixed(1);
+}
+
+// ===========================================
+// ANALYSIS TOOLS
+// ===========================================
+
+async function findNearestFacility() {
+  if (allPlaces.length === 0) {
+    setStatus('No facilities found', 'warning');
+    addSystemMessage('⚠️ Search for services first');
+    return;
+  }
+  
+  // Get selected facility type
+  const facilityType = document.getElementById('nearestFacilityType')?.value || 'any';
+  
+  // Filter by type if not "any"
+  let targetPlaces = allPlaces;
+  if (facilityType !== 'any') {
+    targetPlaces = allPlaces.filter(p => p.type === facilityType);
+    if (targetPlaces.length === 0) {
+      setStatus(`No ${facilityType} facilities found`, 'warning');
+      addSystemMessage(`⚠️ No ${facilityType} services in the area. Try increasing search radius or selecting "Any Service".`);
+      return;
+    }
+  }
+  
+  const nearest = targetPlaces[0];
+  map.flyTo([nearest.lat, nearest.lon], 16, { animate: true, duration: 1.5 });
+  
+  // Draw line to nearest with animation
+  if (userPos || manualMarker) {
+    const origin = getActiveCenter();
+    
+    // Remove existing nearest lines
+    map.eachLayer(layer => {
+      if (layer.options && layer.options.className === 'nearest-line') {
+        map.removeLayer(layer);
+      }
+    });
+    
+    const line = L.polyline([
+      [origin.lat, origin.lng], 
+      [nearest.lat, nearest.lon]
+    ], {
+      color: '#22c55e',
+      weight: 4,
+      dashArray: '10, 10',
+      opacity: 0.8,
+      className: 'nearest-line'
+    }).addTo(map);
+    
+    // Add distance marker at midpoint
+    const midLat = (origin.lat + nearest.lat) / 2;
+    const midLng = (origin.lng + nearest.lon) / 2;
+    
+    const distMarker = L.marker([midLat, midLng], {
+      icon: L.divIcon({
+        html: `<div style="background:#22c55e;color:white;padding:6px 12px;border-radius:8px;font-size:13px;font-weight:700;box-shadow:0 4px 12px rgba(0,0,0,0.3);white-space:nowrap;">📏 ${nearest.dist}m</div>`,
+        className: ''
+      })
+    }).addTo(map);
+    
+    // Fit bounds to show both points
+    map.fitBounds([
+      [origin.lat, origin.lng],
+      [nearest.lat, nearest.lon]
+    ], { padding: [50, 50] });
+    
+    const typeLabel = facilityType === 'any' ? 'service' : facilityType.replace('_', ' ');
+    setStatus(`Nearest ${typeLabel}: ${nearest.name} (${nearest.dist}m)`, 'success');
+    addSystemMessage(`📏 Nearest ${typeLabel.toUpperCase()} Analysis:\n\n🏥 ${nearest.name}\n📍 Type: ${nearest.type}\n📏 Distance: ${nearest.dist}m (${(nearest.dist/1000).toFixed(2)}km)\n⏱️ Walk: ~${Math.ceil(nearest.dist/83)} min\n🚗 Drive: ~${Math.ceil(nearest.dist/333)} min`);
+    
+    // Auto-route to this facility
+    const mode = (document.getElementById('travelMode') && document.getElementById('travelMode').value) || 'driving';
+    await routeTo(origin, { lat: nearest.lat, lng: nearest.lon }, mode);
+    
+    // Remove line and marker after 8 seconds
+    setTimeout(() => {
+      map.removeLayer(line);
+      map.removeLayer(distMarker);
+    }, 8000);
+  } else {
+    const typeLabel = facilityType === 'any' ? 'service' : facilityType.replace('_', ' ');
+    setStatus(`Nearest ${typeLabel}: ${nearest.name} (${nearest.dist}m)`, 'success');
+    addSystemMessage(`📏 Nearest ${typeLabel}: ${nearest.name}\nDistance: ${nearest.dist}m`);
+  }
+}
+
+// ===========================================
+// EVENT LISTENERS
+// ===========================================
+
+// Manual marker controls
+document.getElementById('btnPlaceMarker').addEventListener('click', function() {
+  placeMarkerMode = true;
+  setStatus('Click on the map to place a manual marker', 'warning');
+});
+
+document.getElementById('btnClearMarker').addEventListener('click', function() {
+  if (manualMarker) { map.removeLayer(manualMarker); manualMarker = null; }
+  if (manualCircle) { map.removeLayer(manualCircle); manualCircle = null; }
+  setStatus('Manual marker cleared', 'success');
+  fetchNearby(userPos);
+});
+
+document.getElementById('btnClearRoute').addEventListener('click', function() {
+  clearRoute();
+});
+
+// Map click handling
+map.on('click', async function(e) {
+  const { lat, lng } = e.latlng;
+  
+  // If we're in placement mode, create a manual marker at the clicked location
+  if (placeMarkerMode) {
+    // Clear any previous manual marker
+    if (manualMarker) { map.removeLayer(manualMarker); manualMarker = null; }
+    if (manualCircle) { map.removeLayer(manualCircle); manualCircle = null; }
+    
+    manualMarker = L.marker([lat, lng], {
+      icon: L.divIcon({ 
+        html: '<div style="background:#059669;color:white;border-radius:50%;width:24px;height:24px;border:4px solid white;box-shadow:0 4px 12px rgba(0,0,0,0.3);"></div>', 
+        className: '' 
+      })
+    }).addTo(map).bindPopup('📍 Manual marker').openPopup();
+    
+    manualCircle = L.circle([lat, lng], { 
+      radius: parseInt(document.getElementById('radius').value), 
+      color: '#059669', 
+      fillColor: '#059669', 
+      fillOpacity: 0.08, 
+      weight: 2 
+    }).addTo(map);
+    
+    placeMarkerMode = false;
+    setStatus('Manual marker placed - searching nearby services...', 'success');
+    
+    // Fetch nearby around manual marker
+    await fetchNearby({ lat, lng });
+    return;
+  }
+});
+
+document.getElementById('btnLocate').addEventListener('click', function() {
+  setStatus("Locating...", 'warning');
+  
+  navigator.geolocation.getCurrentPosition(function(pos) {
+    userPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    
+    if (userMarker) map.removeLayer(userMarker);
+    if (radiusCircle) map.removeLayer(radiusCircle);
+    
+    userMarker = L.marker(userPos, {
+      icon: L.divIcon({
+        html: '<div style="background:#ef4444;color:white;border-radius:50%;width:20px;height:20px;border:4px solid white;box-shadow:0 4px 12px rgba(0,0,0,0.3);"></div>',
+        className: ''
+      })
+    }).addTo(map).bindPopup("📍 You are here").openPopup();
+    
+    radiusCircle = L.circle(userPos, {
+      radius: parseInt(document.getElementById('radius').value),
+      color: '#3b82f6',
+      fillColor: '#3b82f6',
+      fillOpacity: 0.1,
+      weight: 2
+    }).addTo(map);
+    
+    map.setView(userPos, 14);
+    setStatus("Location found", 'success');
+    fetchNearby(userPos);
+  }, function(err) {
+    setStatus("Location error", 'error');
+    console.error(err);
+  });
+});
+
+document.getElementById('btnRefresh').addEventListener('click', function() {
+  fetchNearby(getActiveCenter());
+});
+
+document.getElementById('radius').addEventListener('input', function() {
+  document.getElementById('radiusVal').textContent = this.value + ' m';
+  document.getElementById('statRadius').textContent = (this.value / 1000).toFixed(1);
+});
+
+document.getElementById('radius').addEventListener('change', function() {
+  if (radiusCircle) {
+    radiusCircle.setRadius(parseInt(this.value));
+  }
+  if (manualCircle) {
+    manualCircle.setRadius(parseInt(this.value));
+  }
+  fetchNearby(getActiveCenter());
+});
+
+document.getElementById('searchInput').addEventListener('input', function() {
+  const search = this.value.trim().toLowerCase();
+  const filtered = allPlaces.filter(p => search === '' || p.name.toLowerCase().includes(search));
+  renderPlaces(filtered);
+  updateStats(filtered.length, filtered.length > 0 ? filtered[0].dist : null);
+});
+
+document.getElementById('dataSource').addEventListener('change', function() {
+  fetchNearby(getActiveCenter());
+});
+
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const checkbox = btn.querySelector('input');
+    checkbox.checked = !checkbox.checked;
+    btn.classList.toggle('active', checkbox.checked);
+    fetchNearby(getActiveCenter());
+  });
+});
+
+// Dark mode toggle
+document.getElementById('darkModeToggle').addEventListener('click', toggleDarkMode);
+
+
+
+document.getElementById('btnNearest').addEventListener('click', findNearestFacility);
+
+// Map drawing events
+map.on(L.Draw.Event.CREATED, function(e) {
+  const layer = e.layer;
+  drawnItems.addLayer(layer);
+  
+  if (e.layerType === 'circle' || e.layerType === 'polygon') {
+    // Count services within drawn area
+    let within = 0;
+    allPlaces.forEach(p => {
+      const point = L.latLng(p.lat, p.lon);
+      if (layer.getBounds && layer.getBounds().contains(point)) {
+        within++;
+      }
+    });
+    setStatus(`${within} services in drawn area`, 'success');
+  }
+});
+
+function getSelectedTypes() {
+  return Array.from(document.querySelectorAll('.filter:checked')).map(f => f.value);
+}
+
+// ===========================================
+// AI CHATBOT FUNCTION (Query AI Model)
+// ===========================================
+
+async function queryAIModel(message) {
+  if (!CONFIG.ai.apiKey) {
+    return null; // Fallback to rule-based chatbot
+  }
+
+  console.log('%c🤖 AI Request', 'color: #60a5fa; font-weight: bold;');
+  console.log('💬 Message:', message);
+  console.log('🔗 API:', 'https://api.groq.com/openai/v1/chat/completions');
+  console.log('🎯 Model:', CONFIG.ai.model);
+
+  try {
+    // Use Groq API for fast responses
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${CONFIG.ai.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: CONFIG.ai.model,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an Emergency Services AI Assistant in Lahore, Pakistan. You help users find hospitals, clinics, pharmacies, police stations, fire stations, and ambulance services. Provide helpful, accurate, and quick responses. Be conversational and friendly. Include relevant emojis. Always include emergency contact numbers when relevant.'
+          },
+          ...chatHistory.slice(-5).map(msg => ({
+            role: msg.role === 'user' ? 'user' : 'assistant',
+            content: msg.message
+          })),
+          {
+            role: 'user',
+            content: message
+          }
+        ],
+        max_tokens: 500,
+        temperature: 0.7
+      })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log('%c✅ AI Response Received', 'color: #4ade80; font-weight: bold;');
+      console.log('📊 Tokens:', data.usage?.total_tokens || 'N/A');
+      console.log('⏱️ Model:', data.model);
+      console.log('📝 Response:', data.choices[0].message.content.substring(0, 100) + '...');
+      return data.choices[0].message.content;
+    } else {
+      console.error('%c❌ AI API Error', 'color: #f87171; font-weight: bold;');
+      console.error('Status:', response.status, response.statusText);
+      const errorText = await response.text();
+      console.error('Error:', errorText);
+    }
+  } catch (error) {
+    console.error('%c❌ AI Request Failed', 'color: #f87171; font-weight: bold;');
+    console.error('Error:', error);
+  }
+  
+  return null;
+}
+
+// ===========================================
+// DARK MODE TOGGLE
+// ===========================================
+
+function toggleDarkMode() {
+  darkMode = !darkMode;
+  const button = document.getElementById('darkModeToggle');
+  const coordControl = document.querySelector('.coord-control');
+  const layerControl = document.querySelector('.leaflet-control-layers');
+  
+  if (darkMode) {
+    // Switch to dark mode
+    document.body.style.backgroundColor = '#000000';
+    document.getElementById('sidebar').style.background = 'linear-gradient(180deg, #1e293b 0%, #0a0e27 100%)';
+    document.getElementById('sidebar').style.color = '#ffffff';
+    document.getElementById('chatbot').style.background = 'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)';
+    document.getElementById('chatbot').style.color = '#ffffff';
+    
+    // Update coordinate control for dark mode
+    if (coordControl) {
+      coordControl.style.background = 'rgba(0, 0, 0, 0.95)';
+      coordControl.style.color = '#ffffff';
+      coordControl.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+    }
+    
+    // Update layer control for dark mode
+    if (layerControl) {
+      layerControl.style.background = 'rgba(0, 0, 0, 0.9)';
+      layerControl.style.color = '#ffffff';
+    }
+    
+    // Switch map to dark layer
+    map.removeLayer(currentBaseLayer);
+    currentBaseLayer = darkLayer;
+    darkLayer.addTo(map);
+    
+    button.textContent = '☀️ Light';
+    button.style.background = 'rgba(255,255,255,0.1)';
+    button.style.color = '#ffffff';
+    
+    localStorage.setItem('darkMode', 'true');
+  } else {
+    // Switch to light mode
+    document.body.style.backgroundColor = '#ffffff';
+    document.getElementById('sidebar').style.background = 'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)';
+    document.getElementById('sidebar').style.color = '#ffffff';
+    document.getElementById('chatbot').style.background = 'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)';
+    document.getElementById('chatbot').style.color = '#ffffff';
+    
+    // Reset coordinate control for light mode
+    if (coordControl) {
+      coordControl.style.background = 'rgba(30, 41, 59, 0.95)';
+      coordControl.style.color = '#ffffff';
+      coordControl.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+    }
+    
+    // Reset layer control for light mode
+    if (layerControl) {
+      layerControl.style.background = '#ffffff';
+      layerControl.style.color = '#000000';
+    }
+    
+    // Switch map to OSM layer
+    map.removeLayer(currentBaseLayer);
+    currentBaseLayer = osmLayer;
+    osmLayer.addTo(map);
+    
+    button.textContent = '🌙 Dark';
+    button.style.background = 'rgba(59, 130, 246, 0.2)';
+    button.style.color = '#ffffff';
+    
+    localStorage.setItem('darkMode', 'false');
+  }
+}
+
+// Apply saved dark mode preference
+window.addEventListener('load', function() {
+  const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+  if (savedDarkMode) {
+    darkMode = false; // Set to false so toggle switches it to true
+    toggleDarkMode();
+  }
+});
+
+// Utility function
+function distance(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + 
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * 
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Initialize
+renderLegend();
+document.getElementById('btnLocate').click();
+</script>
+</body>
+</html>
